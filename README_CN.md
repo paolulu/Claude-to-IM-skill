@@ -28,6 +28,8 @@ Claude Code / Codex → 读写你的代码库
 - **流式预览** — 实时查看 Claude 的输出（Telegram 和 Discord 支持）
 - **会话持久化** — 对话在守护进程重启后保留
 - **密钥保护** — token 以 `chmod 600` 存储，日志中自动脱敏
+- **多实例支持** — 同时运行多个桥接，每个实例可配置不同的 Bot 和工作目录
+- **Web 管理面板** — 在 `localhost:3247` 可视化管理所有实例，支持新建、配置、启停桥接
 - **无需编写代码** — 安装 Skill 后运行 `/claude-to-im setup` 即可
 
 ## 前置要求
@@ -130,6 +132,9 @@ bash ~/code/Claude-to-IM-skill/scripts/install-codex.sh --link
 | `/claude-to-im logs 200` | "logs 200" | 查看最近 200 行日志 |
 | `/claude-to-im reconfigure` | "reconfigure" / "修改配置" | 交互式修改配置 |
 | `/claude-to-im doctor` | "doctor" / "诊断" | 诊断问题 |
+| `/claude-to-im start-all` | "start-all" / "启动全部" | 启动所有实例 |
+| `/claude-to-im stop-all` | "stop-all" / "停止全部" | 停止所有实例 |
+| `/claude-to-im admin` | "admin" / "管理面板" | 打开 Web 管理面板 |
 
 ## 平台配置指南
 
@@ -169,11 +174,35 @@ bash ~/code/Claude-to-IM-skill/scripts/install-codex.sh --link
 4. `CTI_QQ_ALLOWED_USERS` 填写 `user_openid`（不是 QQ 号）— 可先留空
 5. 如果底层 provider 不支持图片输入，设置 `CTI_QQ_IMAGE_ENABLED=false`
 
+## 多实例
+
+同时运行多个桥接实例，每个实例有独立的 Bot 凭据和工作目录：
+
+```bash
+# 配置命名实例
+/claude-to-im setup project-a
+/claude-to-im setup project-b
+
+# 单独或批量启停
+/claude-to-im start project-a
+/claude-to-im start-all
+/claude-to-im status          # 查看所有实例状态
+```
+
+或使用 **Web 管理面板** 可视化管理：
+
+```bash
+/claude-to-im admin
+# 自动在浏览器打开 http://localhost:3247
+```
+
+管理面板支持：新建/删除实例、编辑配置、启停桥接、查看日志，全程无需命令行操作。
+
 ## 架构
 
 ```
 ~/.claude-to-im/
-├── config.env             ← 凭据与配置 (chmod 600)
+├── config.env             ← 默认实例凭据与配置 (chmod 600)
 ├── data/                  ← 持久化 JSON 存储
 │   ├── sessions.json
 │   ├── bindings.json
@@ -181,9 +210,16 @@ bash ~/code/Claude-to-IM-skill/scripts/install-codex.sh --link
 │   └── messages/          ← 按会话分文件的消息历史
 ├── logs/
 │   └── bridge.log         ← 自动轮转，密钥脱敏
-└── runtime/
-    ├── bridge.pid          ← 守护进程 PID 文件
-    └── status.json         ← 当前状态
+├── runtime/
+│   ├── bridge.pid          ← 守护进程 PID 文件
+│   └── status.json         ← 当前状态
+└── instances/              ← 命名实例
+    ├── project-a/
+    │   ├── config.env
+    │   ├── data/ logs/ runtime/
+    └── project-b/
+        ├── config.env
+        ├── data/ logs/ runtime/
 ```
 
 ### 核心组件
@@ -191,7 +227,8 @@ bash ~/code/Claude-to-IM-skill/scripts/install-codex.sh --link
 | 组件 | 职责 |
 |---|---|
 | `src/main.ts` | 守护进程入口，组装依赖注入，启动 bridge |
-| `src/config.ts` | 加载/保存 `config.env`，映射为 bridge 设置 |
+| `src/config.ts` | 加载/保存 `config.env`，多实例支持，映射为 bridge 设置 |
+| `src/admin.ts` | Web 管理面板 — HTTP 服务器 + REST API，实例可视化管理 |
 | `src/store.ts` | JSON 文件 BridgeStore（30 个方法，写穿缓存） |
 | `src/llm-provider.ts` | Claude Agent SDK `query()` → SSE 流 |
 | `src/codex-provider.ts` | Codex SDK `runStreamed()` → SSE 流 |

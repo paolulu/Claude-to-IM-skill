@@ -28,6 +28,8 @@ Claude Code / Codex → reads/writes your codebase
 - **Streaming preview** — see Claude's response as it types (Telegram & Discord)
 - **Session persistence** — conversations survive daemon restarts
 - **Secret protection** — tokens stored with `chmod 600`, auto-redacted in all logs
+- **Multi-instance** — run multiple bridges simultaneously, each with its own bot and working directory
+- **Web admin panel** — visual management at `localhost:3247` — create, configure, start/stop instances from a browser
 - **Zero code required** — install the skill and run `/claude-to-im setup`, that's it
 
 ## Prerequisites
@@ -130,6 +132,9 @@ All commands are run inside Claude Code or Codex:
 | `/claude-to-im logs 200` | "logs 200" | Show last 200 log lines |
 | `/claude-to-im reconfigure` | "reconfigure" / "修改配置" | Update config interactively |
 | `/claude-to-im doctor` | "doctor" / "诊断" | Diagnose issues |
+| `/claude-to-im start-all` | "start-all" / "启动全部" | Start all instances |
+| `/claude-to-im stop-all` | "stop-all" / "停止全部" | Stop all instances |
+| `/claude-to-im admin` | "admin" / "管理面板" | Open web admin panel |
 
 ## Platform Setup Guides
 
@@ -169,11 +174,35 @@ The `setup` wizard provides inline guidance for every step. Here's a summary:
 4. `CTI_QQ_ALLOWED_USERS` takes `user_openid` values (not QQ numbers) — can be left empty initially
 5. Set `CTI_QQ_IMAGE_ENABLED=false` if the underlying provider doesn't support image input
 
+## Multi-Instance
+
+Run multiple bridges simultaneously, each with its own bot credentials and working directory:
+
+```bash
+# Setup named instances
+/claude-to-im setup project-a
+/claude-to-im setup project-b
+
+# Start/stop individually or all at once
+/claude-to-im start project-a
+/claude-to-im start-all
+/claude-to-im status          # shows all instances
+```
+
+Or use the **web admin panel** for visual management:
+
+```bash
+/claude-to-im admin
+# Opens http://localhost:3247 in your browser
+```
+
+The admin panel lets you create, edit, delete instances, start/stop bridges, and view logs — all from a web UI.
+
 ## Architecture
 
 ```
 ~/.claude-to-im/
-├── config.env             ← Credentials & settings (chmod 600)
+├── config.env             ← Default instance credentials (chmod 600)
 ├── data/                  ← Persistent JSON storage
 │   ├── sessions.json
 │   ├── bindings.json
@@ -181,9 +210,16 @@ The `setup` wizard provides inline guidance for every step. Here's a summary:
 │   └── messages/          ← Per-session message history
 ├── logs/
 │   └── bridge.log         ← Auto-rotated, secrets redacted
-└── runtime/
-    ├── bridge.pid          ← Daemon PID file
-    └── status.json         ← Current status
+├── runtime/
+│   ├── bridge.pid          ← Daemon PID file
+│   └── status.json         ← Current status
+└── instances/              ← Named instances
+    ├── project-a/
+    │   ├── config.env
+    │   ├── data/ logs/ runtime/
+    └── project-b/
+        ├── config.env
+        ├── data/ logs/ runtime/
 ```
 
 ### Key components
@@ -191,7 +227,8 @@ The `setup` wizard provides inline guidance for every step. Here's a summary:
 | Component | Role |
 |---|---|
 | `src/main.ts` | Daemon entry — assembles DI, starts bridge |
-| `src/config.ts` | Load/save `config.env`, map to bridge settings |
+| `src/config.ts` | Load/save `config.env`, multi-instance support, map to bridge settings |
+| `src/admin.ts` | Web admin panel — HTTP server + REST API for instance management |
 | `src/store.ts` | JSON file BridgeStore (30 methods, write-through cache) |
 | `src/llm-provider.ts` | Claude Agent SDK `query()` → SSE stream |
 | `src/codex-provider.ts` | Codex SDK `runStreamed()` → SSE stream |
