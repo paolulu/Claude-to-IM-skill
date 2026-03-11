@@ -2,7 +2,12 @@
 # macOS supervisor — launchd-based process management.
 # Sourced by daemon.sh; expects CTI_HOME, SKILL_DIR, PID_FILE, STATUS_FILE, LOG_FILE.
 
-LAUNCHD_LABEL="com.claude-to-im.bridge"
+# Instance-specific launchd label
+if [ -n "${CTI_INSTANCE:-}" ] && [ "$CTI_INSTANCE" != "default" ]; then
+  LAUNCHD_LABEL="com.claude-to-im.bridge.${CTI_INSTANCE}"
+else
+  LAUNCHD_LABEL="com.claude-to-im.bridge"
+fi
 PLIST_DIR="$HOME/Library/LaunchAgents"
 PLIST_FILE="$PLIST_DIR/$LAUNCHD_LABEL.plist"
 
@@ -30,7 +35,7 @@ build_env_dict() {
 
   # Forward runtime-specific API keys
   local runtime
-  runtime=$(grep "^CTI_RUNTIME=" "$CTI_HOME/config.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d "'" | tr -d '"' || true)
+  runtime=$(grep "^CTI_RUNTIME=" "$INSTANCE_HOME/config.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d "'" | tr -d '"' || true)
   runtime="${runtime:-claude}"
 
   case "$runtime" in

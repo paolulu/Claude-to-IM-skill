@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { CTI_HOME } from './config.js';
+import { INSTANCE_HOME } from './config.js';
 
 const MASK_PATTERNS: RegExp[] = [
   /(?:token|secret|password|api_key)["']?\s*[:=]\s*["']?([^\s"',]+)/gi,
@@ -20,7 +20,7 @@ export function maskSecrets(text: string): string {
   return result;
 }
 
-const LOG_DIR = path.join(CTI_HOME, 'logs');
+const LOG_DIR = path.join(INSTANCE_HOME, 'logs');
 const LOG_PATH = path.join(LOG_DIR, 'bridge.log');
 const MAX_LOG_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_ROTATED = 3;

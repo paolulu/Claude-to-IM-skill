@@ -1,9 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
-CTI_HOME="$HOME/.claude-to-im"
-CONFIG_FILE="$CTI_HOME/config.env"
-PID_FILE="$CTI_HOME/runtime/bridge.pid"
-LOG_FILE="$CTI_HOME/logs/bridge.log"
+CTI_HOME="${CTI_HOME:-$HOME/.claude-to-im}"
+
+# ── Multi-instance support ──
+CTI_INSTANCE="${CTI_INSTANCE:-}"
+ORIG_ARGS=("$@")
+for ((i=1; i<=${#ORIG_ARGS[@]}; i++)); do
+  case "${ORIG_ARGS[$i-1]:-}" in
+    --instance)
+      CTI_INSTANCE="${ORIG_ARGS[$i]:-}"
+      ;;
+    --instance=*)
+      CTI_INSTANCE="${ORIG_ARGS[$i-1]#--instance=}"
+      ;;
+  esac
+done
+
+if [ -n "$CTI_INSTANCE" ] && [ "$CTI_INSTANCE" != "default" ]; then
+  INSTANCE_HOME="$CTI_HOME/instances/$CTI_INSTANCE"
+  echo "Diagnosing instance: $CTI_INSTANCE"
+  echo ""
+else
+  INSTANCE_HOME="$CTI_HOME"
+fi
+
+CONFIG_FILE="$INSTANCE_HOME/config.env"
+PID_FILE="$INSTANCE_HOME/runtime/bridge.pid"
+LOG_FILE="$INSTANCE_HOME/logs/bridge.log"
 
 PASS=0
 FAIL=0
@@ -226,7 +249,7 @@ if [ -f "$CONFIG_FILE" ]; then
 fi
 
 # --- Log directory writable ---
-LOG_DIR="$CTI_HOME/logs"
+LOG_DIR="$INSTANCE_HOME/logs"
 if [ -d "$LOG_DIR" ] && [ -w "$LOG_DIR" ]; then
   check "Log directory is writable" 0
 else

@@ -20,9 +20,9 @@ import type {
   UpsertChannelBindingInput,
 } from 'claude-to-im/src/lib/bridge/host.js';
 import type { ChannelBinding, ChannelType } from 'claude-to-im/src/lib/bridge/types.js';
-import { CTI_HOME } from './config.js';
+import { INSTANCE_HOME } from './config.js';
 
-const DATA_DIR = path.join(CTI_HOME, 'data');
+const DATA_DIR = path.join(INSTANCE_HOME, 'data');
 const MESSAGES_DIR = path.join(DATA_DIR, 'messages');
 
 // ── Helpers ──

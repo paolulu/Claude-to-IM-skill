@@ -33,7 +33,48 @@ export interface Config {
 }
 
 export const CTI_HOME = process.env.CTI_HOME || path.join(os.homedir(), ".claude-to-im");
-export const CONFIG_PATH = path.join(CTI_HOME, "config.env");
+
+// ── Multi-instance support ──
+
+const INSTANCE_NAME_RE = /^[a-zA-Z0-9_-]+$/;
+
+/** Validate an instance name (alphanumeric, hyphens, underscores only). */
+export function validateInstanceName(name: string): boolean {
+  if (!name || name === "default") return false;
+  return INSTANCE_NAME_RE.test(name);
+}
+
+/** Resolve the home directory for a named instance (or the default). */
+export function resolveInstanceHome(instanceName?: string): string {
+  if (!instanceName || instanceName === "default") return CTI_HOME;
+  return path.join(CTI_HOME, "instances", instanceName);
+}
+
+/** List all known instances by scanning the instances/ directory. */
+export function listInstances(): string[] {
+  const instances: string[] = [];
+  // Check if the default instance has a config
+  if (fs.existsSync(path.join(CTI_HOME, "config.env"))) {
+    instances.push("default");
+  }
+  const instancesDir = path.join(CTI_HOME, "instances");
+  if (fs.existsSync(instancesDir)) {
+    for (const entry of fs.readdirSync(instancesDir, { withFileTypes: true })) {
+      if (entry.isDirectory() && fs.existsSync(path.join(instancesDir, entry.name, "config.env"))) {
+        instances.push(entry.name);
+      }
+    }
+  }
+  return instances;
+}
+
+/** The active instance name (from CTI_INSTANCE env var). */
+export const CTI_INSTANCE = process.env.CTI_INSTANCE || "";
+
+/** The resolved home directory for the active instance. */
+export const INSTANCE_HOME = resolveInstanceHome(CTI_INSTANCE || undefined);
+
+export const CONFIG_PATH = path.join(INSTANCE_HOME, "config.env");
 
 function parseEnvFile(content: string): Map<string, string> {
   const entries = new Map<string, string>();
@@ -64,10 +105,12 @@ function splitCsv(value: string | undefined): string[] | undefined {
     .filter(Boolean);
 }
 
-export function loadConfig(): Config {
+/** Load config from an explicit instance home directory. */
+export function loadConfigFrom(instanceHome: string): Config {
+  const configPath = path.join(instanceHome, "config.env");
   let env = new Map<string, string>();
   try {
-    const content = fs.readFileSync(CONFIG_PATH, "utf-8");
+    const content = fs.readFileSync(configPath, "utf-8");
     env = parseEnvFile(content);
   } catch {
     // Config file doesn't exist yet — use defaults
@@ -108,12 +151,18 @@ export function loadConfig(): Config {
   };
 }
 
-function formatEnvLine(key: string, value: string | undefined): string {
-  if (value === undefined || value === "") return "";
-  return `${key}=${value}\n`;
+export function loadConfig(): Config {
+  return loadConfigFrom(INSTANCE_HOME);
 }
 
-export function saveConfig(config: Config): void {
+function formatEnvLine(key: string, value: string | undefined): string {
+  if (value === undefined || value === "") return "";
+  // Quote values to handle spaces and special characters
+  return `${key}="${value}"\n`;
+}
+
+/** Save config to an explicit instance home directory. */
+export function saveConfigTo(config: Config, instanceHome: string): void {
   let out = "";
   out += formatEnvLine("CTI_RUNTIME", config.runtime);
   out += formatEnvLine(
@@ -160,10 +209,15 @@ export function saveConfig(config: Config): void {
   if (config.qqMaxImageSize !== undefined)
     out += formatEnvLine("CTI_QQ_MAX_IMAGE_SIZE", String(config.qqMaxImageSize));
 
-  fs.mkdirSync(CTI_HOME, { recursive: true });
-  const tmpPath = CONFIG_PATH + ".tmp";
+  const configPath = path.join(instanceHome, "config.env");
+  fs.mkdirSync(instanceHome, { recursive: true });
+  const tmpPath = configPath + ".tmp";
   fs.writeFileSync(tmpPath, out, { mode: 0o600 });
-  fs.renameSync(tmpPath, CONFIG_PATH);
+  fs.renameSync(tmpPath, configPath);
+}
+
+export function saveConfig(config: Config): void {
+  saveConfigTo(config, INSTANCE_HOME);
 }
 
 export function maskSecret(value: string): string {

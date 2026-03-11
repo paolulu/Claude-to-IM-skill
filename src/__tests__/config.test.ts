@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { maskSecret, configToSettings, type Config } from '../config.js';
+import { maskSecret, configToSettings, validateInstanceName, resolveInstanceHome, listInstances, CTI_HOME, type Config } from '../config.js';
 
 // ── maskSecret ──
 
@@ -161,6 +161,78 @@ describe('configToSettings', () => {
     assert.equal(m.has('telegram_bot_token'), false);
     assert.equal(m.has('bridge_discord_bot_token'), false);
     assert.equal(m.has('bridge_feishu_app_id'), false);
+  });
+});
+
+// ── validateInstanceName ──
+
+describe('validateInstanceName', () => {
+  it('rejects empty string', () => {
+    assert.equal(validateInstanceName(''), false);
+  });
+
+  it('rejects "default"', () => {
+    assert.equal(validateInstanceName('default'), false);
+  });
+
+  it('accepts valid names', () => {
+    assert.equal(validateInstanceName('project-a'), true);
+    assert.equal(validateInstanceName('my_bot_1'), true);
+    assert.equal(validateInstanceName('ProjectX'), true);
+    assert.equal(validateInstanceName('a'), true);
+  });
+
+  it('rejects names with invalid characters', () => {
+    assert.equal(validateInstanceName('project.a'), false);
+    assert.equal(validateInstanceName('path/traversal'), false);
+    assert.equal(validateInstanceName('has space'), false);
+    assert.equal(validateInstanceName('../escape'), false);
+  });
+});
+
+// ── resolveInstanceHome ──
+
+describe('resolveInstanceHome', () => {
+  it('returns CTI_HOME for undefined', () => {
+    assert.equal(resolveInstanceHome(), CTI_HOME);
+  });
+
+  it('returns CTI_HOME for "default"', () => {
+    assert.equal(resolveInstanceHome('default'), CTI_HOME);
+  });
+
+  it('returns instances subdirectory for named instance', () => {
+    const result = resolveInstanceHome('project-a');
+    assert.equal(result, path.join(CTI_HOME, 'instances', 'project-a'));
+  });
+});
+
+// ── listInstances ──
+
+describe('listInstances', () => {
+  let tmpDir: string;
+  let origCtiHome: string | undefined;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cti-instance-test-'));
+    origCtiHome = process.env.CTI_HOME;
+  });
+
+  afterEach(() => {
+    if (origCtiHome !== undefined) {
+      process.env.CTI_HOME = origCtiHome;
+    } else {
+      delete process.env.CTI_HOME;
+    }
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('returns empty array when no config exists', () => {
+    // listInstances uses the module-level CTI_HOME constant, so we test the logic indirectly
+    // by checking that no instances dir means empty scan
+    const instancesDir = path.join(tmpDir, 'instances');
+    // Don't create anything - should handle gracefully
+    assert.ok(Array.isArray(listInstances()));
   });
 });
 

@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude-to-IM 管理面板</title>
+<style>
+:root {
+  --bg: #f5f5f5;
+  --surface: #ffffff;
+  --text: #1a1a1a;
+  --text-secondary: #666666;
+  --border: #e0e0e0;
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --gray: #6b7280;
+  --gray-hover: #4b5563;
+  --green: #22c55e;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.1);
+  --radius: 8px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; }
+
+/* Header */
+.header {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 16px 24px; display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 10; box-shadow: var(--shadow);
+}
+.header h1 { font-size: 20px; font-weight: 600; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 14px; border: none; border-radius: 6px;
+  font-size: 13px; font-family: var(--font); cursor: pointer; transition: background 0.15s;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: var(--danger-hover); }
+.btn-default { background: var(--border); color: var(--text); }
+.btn-default:hover { background: #ccc; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+/* Container */
+.container { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
+.toolbar { margin-bottom: 20px; }
+
+/* Cards */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px; margin-bottom: 14px;
+  box-shadow: var(--shadow); transition: box-shadow 0.15s;
+}
+.card:hover { box-shadow: var(--shadow-lg); }
+.card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.status-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.status-dot.running { background: var(--green); box-shadow: 0 0 6px rgba(34,197,94,0.4); }
+.status-dot.stopped { background: #d1d5db; }
+.card-name { font-weight: 600; font-size: 16px; }
+.card-status { font-size: 13px; color: var(--text-secondary); margin-left: auto; }
+.card-info { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; padding-left: 20px; }
+.card-info span { display: inline-block; margin-right: 18px; }
+.card-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-left: 20px; }
+
+/* Modal */
+.overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 100; justify-content: center; align-items: flex-start; padding: 40px 16px;
+  overflow-y: auto;
+}
+.overlay.active { display: flex; }
+.modal {
+  background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  width: 100%; max-width: 560px; padding: 24px; position: relative;
+}
+.modal h2 { font-size: 18px; margin-bottom: 20px; }
+.modal-close {
+  position: absolute; top: 16px; right: 16px; background: none; border: none;
+  font-size: 20px; cursor: pointer; color: var(--text-secondary); line-height: 1;
+}
+
+/* Form */
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+.form-group input[type="text"],
+.form-group input[type="password"],
+.form-group select {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 14px; font-family: var(--font); background: #fff;
+}
+.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
+.form-hint { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.checkbox-group { display: flex; gap: 16px; flex-wrap: wrap; }
+.checkbox-group label { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 400; cursor: pointer; }
+.channel-section {
+  border: 1px solid var(--border); border-radius: 6px; padding: 14px;
+  margin-bottom: 10px; background: #fafafa;
+}
+.channel-section h4 { font-size: 14px; margin-bottom: 10px; color: var(--primary); }
+.form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+/* Logs */
+.logs-content {
+  background: #1e1e1e; color: #d4d4d4; font-family: var(--mono); font-size: 12px;
+  padding: 14px; border-radius: 6px; max-height: 420px; overflow-y: auto;
+  white-space: pre-wrap; word-break: break-all; line-height: 1.6;
+}
+
+/* Toast */
+.toast-container { position: fixed; top: 16px; right: 16px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  padding: 10px 18px; border-radius: 6px; font-size: 13px; color: #fff;
+  box-shadow: var(--shadow-lg); animation: slideIn 0.25s ease;
+}
+.toast.success { background: #16a34a; }
+.toast.error { background: var(--danger); }
+@keyframes slideIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+
+/* Empty state */
+.empty { text-align: center; padding: 60px 20px; color: var(--text-secondary); font-size: 15px; }
+
+@media (max-width: 600px) {
+  .header { padding: 12px 16px; }
+  .header h1 { font-size: 16px; }
+  .card { padding: 14px; }
+  .modal { padding: 18px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Claude-to-IM 管理面板</h1>
+  <button class="btn btn-default" onclick="loadInstances()">刷新</button>
+</div>
+
+<div class="container">
+  <div class="toolbar">
+    <button class="btn btn-primary" onclick="showCreateModal()">+ 新建实例</button>
+  </div>
+  <div id="instances"></div>
+</div>
+
+<!-- Create/Edit Modal -->
+<div class="overlay" id="formOverlay">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('formOverlay')">&times;</button>
+    <h2 id="formTitle">新建实例</h2>
+    <form id="instanceForm" onsubmit="return handleFormSubmit(event)">
+      <input type="hidden" id="formMode" value="create">
+
+      <div class="form-group">
+        <label>实例名称</label>
+        <input type="text" id="fName" required pattern="[a-zA-Z0-9\-_]+" placeholder="my-instance">
+        <div class="form-hint">仅支持字母、数字、下划线和连字符</div>
+      </div>
+
+      <div class="form-group">
+        <label>启用频道</label>
+        <div class="checkbox-group">
+          <label><input type="checkbox" value="telegram" onchange="toggleChannel()"> Telegram</label>
+          <label><input type="checkbox" value="discord" onchange="toggleChannel()"> Discord</label>
+          <label><input type="checkbox" value="feishu" onchange="toggleChannel()"> Feishu</label>
+          <label><input type="checkbox" value="qq" onchange="toggleChannel()"> QQ</label>
+        </div>
+      </div>
+
+      <!-- Telegram -->
+      <div class="channel-section" id="sec-telegram" style="display:none">
+        <h4>Telegram 配置</h4>
+        <div class="form-group">
+          <label>Bot Token</label>
+          <input type="text" id="fTgToken" placeholder="123456:ABC-DEF...">
+        </div>
+        <div class="form-group">
+          <label>Chat ID</label>
+          <input type="text" id="fTgChatId" placeholder="可选">
+        </div>
+        <div class="form-group">
+          <label>Allowed Users</label>
+          <input type="text" id="fTgUsers" placeholder="user1,user2">
+        </div>
+      </div>
+
+      <!-- Discord -->
+      <div class="channel-section" id="sec-discord" style="display:none">
+        <h4>Discord 配置</h4>
+        <div class="form-group">
+          <label>Bot Token</label>
+          <input type="text" id="fDcToken">
+        </div>
+        <div class="form-group">
+          <label>Allowed Users</label>
+          <input type="text" id="fDcUsers" placeholder="user1,user2">
+        </div>
+        <div class="form-group">
+          <label>Allowed Channels</label>
+          <input type="text" id="fDcChannels" placeholder="channel-id-1,channel-id-2">
+        </div>
+        <div class="form-group">
+          <label>Allowed Guilds</label>
+          <input type="text" id="fDcGuilds" placeholder="guild-id-1">
+        </div>
+      </div>
+
+      <!-- Feishu -->
+      <div class="channel-section" id="sec-feishu" style="display:none">
+        <h4>Feishu 配置</h4>
+        <div class="form-group">
+          <label>App ID</label>
+          <input type="text" id="fFsAppId">
+        </div>
+        <div class="form-group">
+          <label>App Secret</label>
+          <input type="text" id="fFsSecret">
+        </div>
+        <div class="form-group">
+          <label>Domain (可选)</label>
+          <input type="text" id="fFsDomain" placeholder="https://open.feishu.cn">
+        </div>
+        <div class="form-group">
+          <label>Allowed Users</label>
+          <input type="text" id="fFsUsers" placeholder="user1,user2">
+        </div>
+      </div>
+
+      <!-- QQ -->
+      <div class="channel-section" id="sec-qq" style="display:none">
+        <h4>QQ 配置</h4>
+        <div class="form-group">
+          <label>App ID</label>
+          <input type="text" id="fQqAppId">
+        </div>
+        <div class="form-group">
+          <label>App Secret</label>
+          <input type="text" id="fQqSecret">
+        </div>
+        <div class="form-group">
+          <label>Allowed Users</label>
+          <input type="text" id="fQqUsers" placeholder="user1,user2">
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="fQqImage"> 启用图片
+          </label>
+        </div>
+        <div class="form-group">
+          <label>最大图片大小 (KB)</label>
+          <input type="text" id="fQqMaxImg" placeholder="1024">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>运行时</label>
+        <select id="fRuntime">
+          <option value="auto">auto</option>
+          <option value="claude">claude</option>
+          <option value="codex">codex</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>默认工作目录</label>
+        <input type="text" id="fWorkDir" placeholder="/path/to/project">
+      </div>
+
+      <div class="form-group">
+        <label>默认模型 (可选)</label>
+        <input type="text" id="fModel" placeholder="留空使用默认">
+      </div>
+
+      <div class="form-group">
+        <label>默认模式</label>
+        <select id="fMode">
+          <option value="code">code</option>
+          <option value="plan">plan</option>
+          <option value="ask">ask</option>
+        </select>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-default" onclick="closeModal('formOverlay')">取消</button>
+        <button type="submit" class="btn btn-primary" id="formSubmitBtn">创建</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Logs Modal -->
+<div class="overlay" id="logsOverlay">
+  <div class="modal" style="max-width:720px">
+    <button class="modal-close" onclick="closeModal('logsOverlay')">&times;</button>
+    <h2 id="logsTitle">日志</h2>
+    <div class="logs-content" id="logsContent">加载中...</div>
+    <div class="form-actions" style="margin-top:14px">
+      <button class="btn btn-default" onclick="closeModal('logsOverlay')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="overlay" id="confirmOverlay">
+  <div class="modal" style="max-width:380px">
+    <button class="modal-close" onclick="closeModal('confirmOverlay')">&times;</button>
+    <h2>确认操作</h2>
+    <p id="confirmMsg" style="margin-bottom:20px;color:var(--text-secondary)"></p>
+    <div class="form-actions">
+      <button class="btn btn-default" onclick="closeModal('confirmOverlay')">取消</button>
+      <button class="btn btn-danger" id="confirmBtn">确认</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<script>
+const API = '/api/instances';
+let refreshTimer = null;
+let editingName = null;
+
+// --- Toast ---
+function toast(msg, type) {
+  var el = document.createElement('div');
+  el.className = 'toast ' + (type || 'success');
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(function() { el.remove(); }, 3000);
+}
+
+// --- API helpers ---
+function api(method, path, body) {
+  var opts = { method: method, headers: {} };
+  if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  return fetch(API + (path || ''), opts).then(function(r) {
+    if (!r.ok) return r.text().then(function(t) { throw new Error(t || r.statusText); });
+    return r.json().catch(function() { return null; });
+  });
+}
+
+// --- Instances ---
+function loadInstances() {
+  api('GET', '').then(function(data) {
+    renderInstances(data || []);
+  }).catch(function(e) {
+    toast('加载失败: ' + e.message, 'error');
+  });
+}
+
+function renderInstances(list) {
+  var el = document.getElementById('instances');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">暂无实例，点击上方按钮创建</div>';
+    return;
+  }
+  el.innerHTML = list.map(function(inst) {
+    var running = inst.status === 'running';
+    var cfg = inst.config || {};
+    var channels = (cfg.channels || []).join(', ') || '-';
+    var dir = cfg.workDir || '-';
+    return '<div class="card">' +
+      '<div class="card-header">' +
+        '<span class="status-dot ' + (running ? 'running' : 'stopped') + '"></span>' +
+        '<span class="card-name">' + esc(inst.name) + '</span>' +
+        '<span class="card-status">' + (running ? '运行中' : '已停止') + '</span>' +
+      '</div>' +
+      '<div class="card-info">' +
+        '<span>频道: ' + esc(channels) + '</span>' +
+        '<span>工作目录: ' + esc(dir) + '</span>' +
+      '</div>' +
+      '<div class="card-actions">' +
+        '<button class="btn btn-default btn-sm" onclick="showEditModal(\'' + esc(inst.name) + '\')">编辑</button>' +
+        (running
+          ? '<button class="btn btn-default btn-sm" onclick="stopInstance(\'' + esc(inst.name) + '\')">停止</button>'
+          : '<button class="btn btn-primary btn-sm" onclick="startInstance(\'' + esc(inst.name) + '\')">启动</button>') +
+        '<button class="btn btn-default btn-sm" onclick="showLogs(\'' + esc(inst.name) + '\')">日志</button>' +
+        (running
+          ? '<button class="btn btn-default btn-sm" onclick="runDoctor(\'' + esc(inst.name) + '\')">诊断</button>'
+          : '<button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + esc(inst.name) + '\')">删除</button>') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function esc(s) {
+  if (!s) return '';
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// --- Start / Stop ---
+function startInstance(name) {
+  api('POST', '/' + encodeURIComponent(name) + '/start').then(function(r) {
+    toast('实例 ' + name + ' 已启动');
+    // Daemon needs a moment to write PID file; delay refresh
+    setTimeout(loadInstances, 2000);
+  }).catch(function(e) { toast('启动失败: ' + e.message, 'error'); });
+}
+
+function stopInstance(name) {
+  api('POST', '/' + encodeURIComponent(name) + '/stop').then(function() {
+    toast('实例 ' + name + ' 已停止');
+    setTimeout(loadInstances, 1000);
+  }).catch(function(e) { toast('停止失败: ' + e.message, 'error'); });
+}
+
+// --- Delete ---
+function confirmDelete(name) {
+  document.getElementById('confirmMsg').textContent = '确定要删除实例 "' + name + '" 吗？此操作不可撤销。';
+  document.getElementById('confirmBtn').onclick = function() {
+    closeModal('confirmOverlay');
+    deleteInstance(name);
+  };
+  openModal('confirmOverlay');
+}
+
+function deleteInstance(name) {
+  api('DELETE', '/' + encodeURIComponent(name)).then(function() {
+    toast('实例 ' + name + ' 已删除');
+    loadInstances();
+  }).catch(function(e) { toast('删除失败: ' + e.message, 'error'); });
+}
+
+// --- Logs ---
+function showLogs(name) {
+  document.getElementById('logsTitle').textContent = '日志 — ' + name;
+  document.getElementById('logsContent').textContent = '加载中...';
+  openModal('logsOverlay');
+  fetch(API + '/' + encodeURIComponent(name) + '/logs?lines=100')
+    .then(function(r) { return r.text(); })
+    .then(function(text) {
+      var el = document.getElementById('logsContent');
+      el.textContent = text || '(无日志)';
+      el.scrollTop = el.scrollHeight;
+    })
+    .catch(function(e) {
+      document.getElementById('logsContent').textContent = '加载失败: ' + e.message;
+    });
+}
+
+// --- Doctor ---
+function runDoctor(name) {
+  document.getElementById('logsTitle').textContent = '诊断 — ' + name;
+  document.getElementById('logsContent').textContent = '正在运行诊断...';
+  openModal('logsOverlay');
+  fetch(API + '/' + encodeURIComponent(name) + '/doctor')
+    .then(function(r) { return r.text(); })
+    .then(function(text) {
+      var el = document.getElementById('logsContent');
+      el.textContent = text || '(无输出)';
+      el.scrollTop = el.scrollHeight;
+    })
+    .catch(function(e) {
+      document.getElementById('logsContent').textContent = '诊断失败: ' + e.message;
+    });
+}
+
+// --- Modal helpers ---
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// --- Channel toggle ---
+function getCheckedChannels() {
+  var boxes = document.querySelectorAll('#instanceForm .checkbox-group input[type=checkbox]');
+  var out = [];
+  boxes.forEach(function(cb) { if (cb.checked) out.push(cb.value); });
+  return out;
+}
+
+function toggleChannel() {
+  var channels = getCheckedChannels();
+  ['telegram', 'discord', 'feishu', 'qq'].forEach(function(ch) {
+    document.getElementById('sec-' + ch).style.display = channels.indexOf(ch) >= 0 ? '' : 'none';
+  });
+}
+
+// --- Secret field placeholder ---
+function setSecretPlaceholders(show) {
+  var hint = '****xxxx (留空保持不变)';
+  var ids = ['fTgToken', 'fDcToken', 'fFsSecret', 'fQqSecret'];
+  ids.forEach(function(id) {
+    document.getElementById(id).placeholder = show ? hint : '';
+  });
+}
+
+// --- Create modal ---
+function showCreateModal() {
+  editingName = null;
+  document.getElementById('formMode').value = 'create';
+  document.getElementById('formTitle').textContent = '新建实例';
+  document.getElementById('formSubmitBtn').textContent = '创建';
+  document.getElementById('fName').disabled = false;
+  document.getElementById('instanceForm').reset();
+  setSecretPlaceholders(false);
+  toggleChannel();
+  openModal('formOverlay');
+}
+
+// --- Edit modal ---
+function showEditModal(name) {
+  editingName = name;
+  document.getElementById('formMode').value = 'edit';
+  document.getElementById('formTitle').textContent = '编辑实例 — ' + name;
+  document.getElementById('formSubmitBtn').textContent = '保存';
+  document.getElementById('instanceForm').reset();
+
+  api('GET', '/' + encodeURIComponent(name)).then(function(inst) {
+    var cfg = inst.config || {};
+    document.getElementById('fName').value = name;
+    document.getElementById('fName').disabled = true;
+
+    // Check channel boxes
+    var channels = cfg.channels || [];
+    document.querySelectorAll('#instanceForm .checkbox-group input[type=checkbox]').forEach(function(cb) {
+      cb.checked = channels.indexOf(cb.value) >= 0;
+    });
+    toggleChannel();
+
+    // Populate fields
+    if (cfg.telegram) {
+      document.getElementById('fTgToken').value = '';
+      document.getElementById('fTgChatId').value = cfg.telegram.chatId || '';
+      document.getElementById('fTgUsers').value = (cfg.telegram.allowedUsers || []).join(',');
+    }
+    if (cfg.discord) {
+      document.getElementById('fDcToken').value = '';
+      document.getElementById('fDcUsers').value = (cfg.discord.allowedUsers || []).join(',');
+      document.getElementById('fDcChannels').value = (cfg.discord.allowedChannels || []).join(',');
+      document.getElementById('fDcGuilds').value = (cfg.discord.allowedGuilds || []).join(',');
+    }
+    if (cfg.feishu) {
+      document.getElementById('fFsAppId').value = cfg.feishu.appId || '';
+      document.getElementById('fFsSecret').value = '';
+      document.getElementById('fFsDomain').value = cfg.feishu.domain || '';
+      document.getElementById('fFsUsers').value = (cfg.feishu.allowedUsers || []).join(',');
+    }
+    if (cfg.qq) {
+      document.getElementById('fQqAppId').value = cfg.qq.appId || '';
+      document.getElementById('fQqSecret').value = '';
+      document.getElementById('fQqUsers').value = (cfg.qq.allowedUsers || []).join(',');
+      document.getElementById('fQqImage').checked = !!cfg.qq.imageEnabled;
+      document.getElementById('fQqMaxImg').value = cfg.qq.maxImageSize || '';
+    }
+
+    document.getElementById('fRuntime').value = cfg.runtime || 'claude';
+    document.getElementById('fWorkDir').value = cfg.workDir || '';
+    document.getElementById('fModel').value = cfg.model || '';
+    document.getElementById('fMode').value = cfg.mode || 'code';
+
+    setSecretPlaceholders(true);
+    openModal('formOverlay');
+  }).catch(function(e) { toast('加载配置失败: ' + e.message, 'error'); });
+}
+
+// --- Collect form data ---
+function collectFormData() {
+  var channels = getCheckedChannels();
+  var data = {
+    channels: channels,
+    runtime: document.getElementById('fRuntime').value,
+    workDir: document.getElementById('fWorkDir').value,
+    model: document.getElementById('fModel').value || undefined,
+    mode: document.getElementById('fMode').value
+  };
+
+  if (channels.indexOf('telegram') >= 0) {
+    data.telegram = {};
+    var v = document.getElementById('fTgToken').value.trim();
+    if (v) data.telegram.botToken = v;
+    v = document.getElementById('fTgChatId').value.trim();
+    if (v) data.telegram.chatId = v;
+    v = document.getElementById('fTgUsers').value.trim();
+    if (v) data.telegram.allowedUsers = v.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  }
+
+  if (channels.indexOf('discord') >= 0) {
+    data.discord = {};
+    var v = document.getElementById('fDcToken').value.trim();
+    if (v) data.discord.botToken = v;
+    v = document.getElementById('fDcUsers').value.trim();
+    if (v) data.discord.allowedUsers = v.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+    v = document.getElementById('fDcChannels').value.trim();
+    if (v) data.discord.allowedChannels = v.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+    v = document.getElementById('fDcGuilds').value.trim();
+    if (v) data.discord.allowedGuilds = v.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  }
+
+  if (channels.indexOf('feishu') >= 0) {
+    data.feishu = {};
+    var v = document.getElementById('fFsAppId').value.trim();
+    if (v) data.feishu.appId = v;
+    v = document.getElementById('fFsSecret').value.trim();
+    if (v) data.feishu.appSecret = v;
+    v = document.getElementById('fFsDomain').value.trim();
+    if (v) data.feishu.domain = v;
+    v = document.getElementById('fFsUsers').value.trim();
+    if (v) data.feishu.allowedUsers = v.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  }
+
+  if (channels.indexOf('qq') >= 0) {
+    data.qq = {};
+    var v = document.getElementById('fQqAppId').value.trim();
+    if (v) data.qq.appId = v;
+    v = document.getElementById('fQqSecret').value.trim();
+    if (v) data.qq.appSecret = v;
+    v = document.getElementById('fQqUsers').value.trim();
+    if (v) data.qq.allowedUsers = v.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+    data.qq.imageEnabled = document.getElementById('fQqImage').checked;
+    v = document.getElementById('fQqMaxImg').value.trim();
+    if (v) data.qq.maxImageSize = parseInt(v, 10);
+  }
+
+  return data;
+}
+
+// --- Submit ---
+function handleFormSubmit(e) {
+  e.preventDefault();
+  var mode = document.getElementById('formMode').value;
+  var data = collectFormData();
+
+  if (mode === 'create') {
+    data.name = document.getElementById('fName').value.trim();
+    if (!data.name) { toast('请输入实例名称', 'error'); return false; }
+    api('POST', '', data).then(function() {
+      toast('实例 ' + data.name + ' 已创建');
+      closeModal('formOverlay');
+      loadInstances();
+    }).catch(function(e) { toast('创建失败: ' + e.message, 'error'); });
+  } else {
+    api('PUT', '/' + encodeURIComponent(editingName), data).then(function() {
+      toast('实例 ' + editingName + ' 已更新');
+      closeModal('formOverlay');
+      loadInstances();
+    }).catch(function(e) { toast('更新失败: ' + e.message, 'error'); });
+  }
+  return false;
+}
+
+// --- Close modal on overlay click ---
+document.querySelectorAll('.overlay').forEach(function(overlay) {
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) closeModal(overlay.id);
+  });
+});
+
+// --- Close modal on Escape ---
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.overlay.active').forEach(function(o) { closeModal(o.id); });
+  }
+});
+
+// --- Init ---
+loadInstances();
+refreshTimer = setInterval(loadInstances, 10000);
+</script>
+</body>
+</html>

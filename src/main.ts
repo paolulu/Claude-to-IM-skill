@@ -14,14 +14,14 @@ import * as bridgeManager from 'claude-to-im/src/lib/bridge/bridge-manager.js';
 import 'claude-to-im/src/lib/bridge/adapters/index.js';
 
 import type { LLMProvider } from 'claude-to-im/src/lib/bridge/host.js';
-import { loadConfig, configToSettings, CTI_HOME } from './config.js';
+import { loadConfig, configToSettings, INSTANCE_HOME, CTI_INSTANCE } from './config.js';
 import type { Config } from './config.js';
 import { JsonFileStore } from './store.js';
 import { SDKLLMProvider, resolveClaudeCliPath } from './llm-provider.js';
 import { PendingPermissions } from './permission-gateway.js';
 import { setupLogger } from './logger.js';
 
-const RUNTIME_DIR = path.join(CTI_HOME, 'runtime');
+const RUNTIME_DIR = path.join(INSTANCE_HOME, 'runtime');
 const STATUS_FILE = path.join(RUNTIME_DIR, 'status.json');
 const PID_FILE = path.join(RUNTIME_DIR, 'bridge.pid');
 
@@ -90,7 +90,8 @@ async function main(): Promise<void> {
   setupLogger();
 
   const runId = crypto.randomUUID();
-  console.log(`[claude-to-im] Starting bridge (run_id: ${runId})`);
+  const instanceLabel = CTI_INSTANCE ? ` instance: ${CTI_INSTANCE},` : '';
+  console.log(`[claude-to-im] Starting bridge (${instanceLabel}run_id: ${runId})`);
 
   const settings = configToSettings(config);
   const store = new JsonFileStore(settings);
